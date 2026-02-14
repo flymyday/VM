@@ -1,0 +1,1914 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VN OneFile Integrated (No React / No Build)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;overflow:hidden}
+    .scroll-custom::-webkit-scrollbar{width:6px}
+    .scroll-custom::-webkit-scrollbar-thumb{background:#4b5563;border-radius:3px}
+    .scroll-custom::-webkit-scrollbar-track{background:#1f2937}
+    input,textarea,select{font-size:14px!important;background:#111827;color:#fff;border-color:#374151}
+    .file-input-wrapper{position:relative;overflow:hidden;display:inline-block;cursor:pointer}
+    .file-input-wrapper input[type=file]{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer}
+    #preview-frame-container{transition:all .2s ease}
+    .mode-landscape{width:100%;height:100%}
+    .mode-portrait{width:360px;height:640px;border:4px solid #333;border-radius:20px;box-shadow:0 0 20px rgba(0,0,0,.5)}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+  </style>
+</head>
+
+<body class="bg-gray-900 text-white h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-80 bg-gray-800 border-r border-gray-700 flex flex-col h-full">
+    <div class="p-4 border-b border-gray-700 bg-gray-900">
+      <div class="text-lg font-bold text-pink-500">VN OneFile</div>
+      <div class="text-xs text-gray-400">Visual(Prompt) + Game Maker + Preview</div>
+    </div>
+
+    <div class="p-3 border-b border-gray-700 space-y-2">
+      <div class="flex gap-2">
+        <button id="tabGame" class="flex-1 py-2 rounded bg-pink-600 text-sm font-bold">Game Maker</button>
+        <button id="tabVisual" class="flex-1 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm font-bold">Visual Maker</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-[10px] text-gray-400">프로젝트 이름</label>
+          <input id="projectName" class="w-full px-2 py-1 rounded border text-xs" value="MyVN">
+        </div>
+        <div>
+          <label class="text-[10px] text-gray-400">게임 타이틀</label>
+          <input id="gameTitle" class="w-full px-2 py-1 rounded border text-xs" value="My Visual Novel">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="text-[10px] text-gray-400">글꼴</label>
+          <select id="fontSel" class="w-full px-2 py-1 rounded border text-xs">
+            <option value="sans" selected>고딕</option>
+            <option value="serif">명조</option>
+            <option value="cursive">손글씨</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] text-gray-400">타이틀 효과(네온 제외)</label>
+          <select id="titleStyleSel" class="w-full px-2 py-1 rounded border text-xs">
+            <option value="glow" selected>glow</option>
+            <option value="paper">paper</option>
+            <option value="minimal">minimal</option>
+            <option value="romantic">romantic</option>
+            <option value="sleek">sleek</option>
+            <option value="classic">classic</option>
+            <option value="sparkle">sparkle</option>
+            <option value="outline">outline</option>
+  <option value="gold">gold</option>
+  <option value="glass">glass</option>
+  <option value="luxury">luxury</option>
+  <option value="subtle">subtle</option>
+          </select>
+        </div>
+      </div>
+
+            <div class="grid grid-cols-1 gap-2">
+        <button id="btnNewProject" class="py-2 bg-red-600 hover:bg-red-700 rounded text-xs font-bold">
+          새 프로젝트
+        </button>
+      </div>
+
+<div class="grid grid-cols-2 gap-2">
+        <button id="btnSaveProject" class="py-2 bg-indigo-600 hover:bg-indigo-700 rounded text-xs font-bold">저장(.json)</button>
+        <label class="file-input-wrapper py-2 bg-gray-600 hover:bg-gray-500 rounded text-xs font-bold text-center">
+          불러오기
+          <input id="loadProjectFile" type="file" accept=".json">
+        </label>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btnExportData" class="py-2 bg-green-600 hover:bg-green-700 rounded text-xs font-bold">data.json</button>
+        <button id="btnPreview" class="py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold border border-gray-600">미리보기</button>
+      </div>
+
+      <div class="text-[10px] text-yellow-300/80 leading-snug pt-2 border-t border-gray-700 text-center">
+        규칙: <b>세로만 단독 불가</b><br>
+        (가로만 또는 가로+세로만 허용)
+      </div>
+
+      <div id="status" class="text-[10px] text-gray-300 text-center"></div>
+    </div>
+
+    <!-- Scene list -->
+    <div class="flex-1 overflow-y-auto p-2 scroll-custom" id="sceneList"></div>
+
+    <div class="p-3 border-t border-gray-700 bg-gray-800 space-y-2">
+      <button id="btnAddScene" class="w-full py-2 border-2 border-dashed border-gray-600 rounded-lg text-gray-300 hover:border-pink-500 hover:text-pink-400 transition-colors text-sm font-bold">
+        + 새 장면
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 min-w-0 h-full relative">
+    <!-- Game Maker Panel -->
+    <section id="panelGame" class="h-full overflow-y-auto scroll-custom p-6">
+      <div class="max-w-5xl mx-auto space-y-6 pb-24">
+
+        <div class="flex items-center justify-between">
+          <div class="text-xl font-bold">
+            <span class="bg-pink-600 px-2 py-1 rounded text-xs" id="activeSceneBadge">Scene 1</span>
+            <span class="text-gray-300 text-sm ml-2">편집</span>
+          </div>
+          <div class="text-xs text-gray-400 hidden md:block">
+            변수 치환: <span class="mono text-yellow-300">{{player}}</span>
+          </div>
+        </div>
+
+        <!-- Scene Mode -->
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-bold text-cyan-300">장면 타입</div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="bg-gray-900 border border-gray-700 rounded p-3">
+              <label class="text-xs text-gray-400">타입</label>
+              <select id="sceneType" class="w-full mt-1 p-2 rounded border">
+                <option value="normal" selected>일반 장면(대사/선택지)</option>
+                <option value="title">타이틀 카드(프레임+텍스트 오버레이)</option>
+              </select>
+              <div class="text-[10px] text-gray-500 mt-2">
+                타이틀 카드는 “이미지에 텍스트 넣지 않음”. 텍스트는 엔진이 예쁘게 렌더링합니다.
+              </div>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-700 rounded p-3 space-y-2">
+              <div class="text-xs text-gray-400">타이틀 카드 옵션</div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-[10px] text-gray-400">제목</label>
+                  <input id="titleText" class="w-full px-2 py-1 rounded border text-xs" placeholder="EP.01 첫 만남">
+                </div>
+                <div>
+                  <label class="text-[10px] text-gray-400">부제</label>
+                  <input id="subtitleText" class="w-full px-2 py-1 rounded border text-xs" placeholder="Prologue">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-[10px] text-gray-400">안전영역</label>
+                  <select id="safeAreaPos" class="w-full px-2 py-1 rounded border text-xs">
+                    <option value="center" selected>중앙</option>
+                    <option value="top">상단</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-[10px] text-gray-400">프레임 강도</label>
+                  <select id="frameIntensity" class="w-full px-2 py-1 rounded border text-xs">
+                    <option value="subtle" selected>약</option>
+                    <option value="medium">중</option>
+                    <option value="strong">강</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Backgrounds -->
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-bold text-blue-300">배경 업로드</div>
+            <div class="text-[10px] text-gray-400 hidden md:block">
+              가로만 있으면 세로에서 cover 크롭으로 사용
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-gray-900 p-3 rounded border border-gray-700 flex gap-3 items-center">
+              <div id="prevLand" class="w-20 h-12 bg-black border border-gray-600 bg-cover bg-center rounded shrink-0"></div>
+              <div class="flex-1">
+                <div class="text-xs text-gray-300 font-bold">💻 가로 배경</div>
+                <label class="file-input-wrapper w-full bg-gray-700 hover:bg-gray-600 text-center py-1.5 rounded border border-gray-600 text-xs mt-1">
+                  업로드
+                  <input type="file" accept="image/*" id="bgLandFile">
+                </label>
+              </div>
+            </div>
+
+            <div class="bg-gray-900 p-3 rounded border border-gray-700 flex gap-3 items-center relative overflow-hidden">
+              <div class="absolute top-0 right-0 bg-pink-600 text-[9px] px-1.5 py-0.5 rounded-bl font-bold">Shorts</div>
+              <div id="prevPort" class="w-8 h-12 bg-black border border-gray-600 bg-cover bg-center rounded shrink-0 flex items-center justify-center text-[8px] text-gray-500">PC</div>
+              <div class="flex-1">
+                <div class="text-xs text-gray-300 font-bold">📱 세로 배경(선택)</div>
+                <label class="file-input-wrapper w-full bg-gray-700 hover:bg-gray-600 text-center py-1.5 rounded border border-gray-600 text-xs mt-1">
+                  업로드
+                  <input type="file" accept="image/*" id="bgPortFile">
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-[10px] text-gray-400">
+            * 규칙: 세로 배경만 단독 불가. (세로 업로드 시 가로가 없으면 차단)
+          </div>
+        </div>
+
+        <!-- Title Frame Uploads -->
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-bold text-purple-300">타이틀 프레임 업로드(타이틀 타입에서 사용)</div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-gray-900 p-3 rounded border border-gray-700 flex gap-3 items-center">
+              <div id="prevTLand" class="w-20 h-12 bg-black border border-gray-600 bg-cover bg-center rounded shrink-0"></div>
+              <div class="flex-1">
+                <div class="text-xs text-gray-300 font-bold">💻 타이틀 프레임(가로)</div>
+                <label class="file-input-wrapper w-full bg-gray-700 hover:bg-gray-600 text-center py-1.5 rounded border border-gray-600 text-xs mt-1">
+                  업로드
+                  <input type="file" accept="image/*" id="tLandFile">
+                </label>
+              </div>
+            </div>
+
+            <div class="bg-gray-900 p-3 rounded border border-gray-700 flex gap-3 items-center relative overflow-hidden">
+              <div class="absolute top-0 right-0 bg-pink-600 text-[9px] px-1.5 py-0.5 rounded-bl font-bold">Shorts</div>
+              <div id="prevTPort" class="w-8 h-12 bg-black border border-gray-600 bg-cover bg-center rounded shrink-0 flex items-center justify-center text-[8px] text-gray-500">PC</div>
+              <div class="flex-1">
+                <div class="text-xs text-gray-300 font-bold">📱 타이틀 프레임(세로)</div>
+                <label class="file-input-wrapper w-full bg-gray-700 hover:bg-gray-600 text-center py-1.5 rounded border border-gray-600 text-xs mt-1">
+                  업로드
+                  <input type="file" accept="image/*" id="tPortFile">
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-[10px] text-gray-400">
+            * 타이틀 프레임도 동일 규칙: 세로 프레임만 단독 불가
+          </div>
+        </div>
+
+        <!-- Script -->
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-bold text-pink-300">대사</div>
+            <button id="btnAddLine" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-xs border border-gray-600">+ 추가</button>
+          </div>
+          <div id="scriptList" class="space-y-3"></div>
+        </div>
+
+        <!-- Choices -->
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-bold text-green-300">선택지</div>
+            <button id="btnAddChoice" class="bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded text-xs border border-gray-600">+ 추가</button>
+          </div>
+          <div id="choiceList" class="space-y-2"></div>
+          <div class="text-[10px] text-gray-500 text-center">선택지 없으면 다음 장면으로 자동 진행</div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Visual Maker Panel -->
+    <section id="panelVisual" class="hidden h-full overflow-y-auto scroll-custom p-6">
+      <div class="max-w-5xl mx-auto space-y-6 pb-24">
+        <div class="text-xl font-bold">Visual Maker (프롬프트 생성기)</div>
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-bold text-cyan-300">OpenAI 이미지 생성</div>
+            <div class="text-[10px] text-gray-400">
+              브라우저에서 OpenAI 호출 · CORS로 막히면 프록시 필요
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-gray-400">API Key</label>
+              <input id="vmApiKey" type="password" class="w-full px-2 py-2 rounded border" placeholder="sk-..." />
+              <div class="text-[10px] text-gray-500 mt-1">로컬 저장소에 저장됩니다(개인용).</div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">API URL</label>
+              <input id="vmApiUrl" class="w-full px-2 py-2 rounded border"
+                     value="https://api.openai.com/v1/images/generations" />
+              <div class="text-[10px] text-gray-500 mt-1">CORS 오류 시 프록시 URL로 바꾸세요.</div>
+            </div>
+
+            <div>
+              <label class="text-xs text-gray-400">모델</label>
+              <select id="vmModel" class="w-full px-2 py-2 rounded border">
+                <option value="gpt-image-1.5" selected>gpt-image-1.5</option>
+                <option value="gpt-image-1">gpt-image-1</option>
+                <option value="gpt-image-1-mini">gpt-image-1-mini</option>
+                <option value="dall-e-3">dall-e-3</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">품질</label>
+              <select id="vmQuality" class="w-full px-2 py-2 rounded border">
+                <option value="auto" selected>auto</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs text-gray-400">포맷</label>
+              <select id="vmOutFmt" class="w-full px-2 py-2 rounded border">
+                <option value="png" selected>png</option>
+                <option value="webp">webp</option>
+                <option value="jpeg">jpeg</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">배경</label>
+              <select id="vmBgSetting" class="w-full px-2 py-2 rounded border">
+                <option value="auto" selected>auto</option>
+                <option value="opaque">opaque</option>
+                <option value="transparent">transparent</option>
+              </select>
+              <div class="text-[10px] text-gray-500 mt-1">투명은 gpt-image-*에서만 권장.</div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2 items-center pt-1">
+            <label class="flex items-center gap-2 text-sm">
+              <input id="vmAutoApply" type="checkbox" checked class="accent-cyan-400"> 생성 후 현재 씬에 자동 적용
+            </label>
+            <span class="text-[10px] text-gray-500">가로만 OK / 세로만 금지 규칙 유지</span>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button id="vmGenBgLand" class="px-3 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-sm font-bold">
+              BG 가로 생성
+            </button>
+            <button id="vmGenBgPort" class="px-3 py-2 rounded bg-cyan-600 hover:bg-cyan-500 text-sm font-bold">
+              BG 세로 생성
+            </button>
+            <button id="vmGenTitleLand" class="px-3 py-2 rounded bg-purple-600 hover:bg-purple-500 text-sm font-bold">
+              타이틀프레임 가로 생성
+            </button>
+            <button id="vmGenTitlePort" class="px-3 py-2 rounded bg-purple-600 hover:bg-purple-500 text-sm font-bold">
+              타이틀프레임 세로 생성
+            </button>
+          </div>
+
+          <div id="vmApiStatus" class="text-[11px] text-gray-300 whitespace-pre-wrap"></div>
+        </div>
+
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-gray-400">장소(필수)</label>
+              <input id="vmPlace" class="w-full px-2 py-2 rounded border" placeholder="예: 학교 복도, 비 오는 거리" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">시간/날씨(선택)</label>
+              <input id="vmTime" class="w-full px-2 py-2 rounded border" placeholder="예: 밤, 비, 노을" />
+            </div>
+            <div class="md:col-span-2">
+              <label class="text-xs text-gray-400">키 오브젝트(선택, 쉼표)</label>
+              <input id="vmObj" class="w-full px-2 py-2 rounded border" placeholder="예: 가로등, 젖은 보도블록, 빗물 웅덩이" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">분위기(선택)</label>
+              <input id="vmMood" class="w-full px-2 py-2 rounded border" placeholder="예: 평온, 긴장, 로맨틱" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">스타일</label>
+              <select id="vmStyle" class="w-full px-2 py-2 rounded border">
+                <option value="anime_clean">애니(클린)</option>
+                <option value="anime_pastel">애니(파스텔)</option>
+                <option value="semi_real">세미리얼</option>
+                <option value="toon_flat">툰(평면)</option>
+                <option value="pixel_art">픽셀아트</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-700 pt-3 space-y-2">
+            <div class="flex flex-wrap gap-4 items-center">
+              <label class="flex items-center gap-2 text-sm">
+                <input id="vmLand" type="checkbox" checked class="accent-pink-500"> 가로(16:9)
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input id="vmPort" type="checkbox" checked class="accent-pink-500"> 세로(9:16)
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                <input id="vmTitleFrame" type="checkbox" class="accent-cyan-400"> 타이틀 프레임 모드
+              </label>
+            </div>
+
+            <div id="vmTitleOpts" class="hidden bg-gray-900 border border-gray-700 rounded p-3 space-y-2">
+              <div class="text-[10px] text-gray-400">
+                타이틀 프레임은 <b>텍스트 없이</b> 장식 + 안전영역만 확보합니다. (텍스트는 Game Maker가 렌더링)
+              </div>
+              <div class="flex gap-4">
+                <label class="flex items-center gap-2 text-sm">
+                  <input type="radio" name="vmSafe" value="center" checked class="accent-cyan-400"> 중앙 안전영역
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                  <input type="radio" name="vmSafe" value="top" class="accent-cyan-400"> 상단 안전영역
+                </label>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs text-gray-400">장식 힌트(선택)</label>
+                  <input id="vmOrn" class="w-full px-2 py-2 rounded border" placeholder="예: subtle glow frame, particles, filigree" />
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400">장식 강도</label>
+                  <select id="vmOrnInt" class="w-full px-2 py-2 rounded border">
+                    <option value="subtle" selected>약</option>
+                    <option value="medium">중</option>
+                    <option value="strong">강</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button id="vmBuild" class="px-4 py-2 rounded bg-cyan-600 hover:bg-cyan-500 font-semibold">프롬프트 생성</button>
+              <label class="ml-2 flex items-center gap-2 text-xs text-gray-300">
+                <input id="vmMock" type="checkbox" class="accent-cyan-400">
+                SVG 미리보기
+              </label>
+              <button id="vmSample" class="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">샘플</button>
+              <button id="vmCopy" class="ml-auto px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">전체 복사</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 space-y-3">
+          <div class="text-sm font-bold">출력</div>
+
+          <div id="vmOutLandWrap" class="space-y-2">
+            <div class="text-xs text-gray-300 font-bold">가로(16:9)</div>
+            <pre id="vmOutLand" class="whitespace-pre-wrap text-xs leading-5 p-2 rounded bg-gray-900 border border-gray-700"></pre>
+          </div>
+          <img id="vmImgLand" class="hidden w-full rounded border border-gray-700" alt="land preview"/>
+
+
+          <div id="vmOutPortWrap" class="space-y-2">
+            <div class="text-xs text-gray-300 font-bold">세로(9:16)</div>
+            <pre id="vmOutPort" class="whitespace-pre-wrap text-xs leading-5 p-2 rounded bg-gray-900 border border-gray-700"></pre>
+          </div>
+          <img id="vmImgPort" class="hidden w-full rounded border border-gray-700" alt="port preview"/>
+
+
+          <div class="space-y-2">
+            <div class="text-xs text-gray-300 font-bold">Negative</div>
+            <pre id="vmOutNeg" class="whitespace-pre-wrap text-xs leading-5 p-2 rounded bg-gray-900 border border-gray-700"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Preview overlay -->
+    <div id="previewOverlay" class="hidden fixed inset-0 bg-black z-50 flex flex-col items-center justify-center bg-opacity-95">
+      <div class="absolute top-4 w-full flex justify-center items-center gap-4 z-50">
+        <div class="bg-gray-800 rounded-full p-1 flex gap-1 border border-gray-600">
+          <button id="btnLand" class="px-3 py-1 rounded-full text-xs font-bold bg-pink-600 text-white">PC</button>
+          <button id="btnPort" class="px-3 py-1 rounded-full text-xs font-bold text-gray-300 hover:text-white">모바일</button>
+        </div>
+        <button id="btnReloadPrev" class="bg-gray-800 text-white w-8 h-8 rounded-full border border-gray-600 hover:bg-gray-700">↻</button>
+        <button id="btnClosePrev" class="bg-red-600 text-white w-8 h-8 rounded-full hover:bg-red-500">×</button>
+      </div>
+      <div id="preview-frame-container" class="mode-landscape bg-black relative">
+        <iframe id="gameFrame" class="w-full h-full border-none"></iframe>
+      </div>
+    </div>
+
+  </main>
+
+<script>
+/* ===============================
+   State
+=============================== */
+function makeDefaultProject(){
+  return {
+  name: "MyVN",
+  settings: { font: "sans", titleStyle: "glow", gameTitle: "My Visual Novel" },
+  scenes: [{
+    id: 1,
+    type: "normal", // normal | title
+    // bg
+    background: "",
+    backgroundMobile: "",
+    // title frame (optional)
+    titleFrame: "",
+    titleFrameMobile: "",
+    titleText: "",
+    subtitleText: "",
+    safeAreaPos: "center", // center | top
+    frameIntensity: "subtle",
+    // content
+    script: [{ speaker: "???", text: "안녕하세요. {{player}}", motion: "" }],
+    choices: []
+  }]
+}
+}
+
+let project = makeDefaultProject();
+
+let activeSceneId = 1;
+let previewMode = "landscape"; // landscape | portrait
+let previewUrl = null;
+
+/* ===============================
+   Helpers
+=============================== */
+const $ = (id) => document.getElementById(id);
+
+function escapeHtml(s){
+  return String(s??"")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+function escapeAttr(s){ return escapeHtml(s).replaceAll("\n"," "); }
+
+function readFileAsDataURL(file){
+  return new Promise(res=>{
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.readAsDataURL(file);
+  });
+}
+
+function autosave(){
+  try{
+    localStorage.setItem("vn_onefile_autosave_v1", JSON.stringify(project));
+  }catch(e){}
+}
+
+function setStatus(msg){
+  $("status").textContent = msg || "";
+}
+
+
+// Reindex scenes to ensure Scene 1 always exists and ids are sequential (1..N).
+// Also rewrites choice nextSceneId references to keep links valid.
+function reindexScenes(){
+  const oldToNew = new Map();
+  project.scenes.forEach((s, i) => oldToNew.set(Number(s.id), i + 1));
+
+  project.scenes.forEach((s, i) => {
+    const newId = i + 1;
+    const oldId = Number(s.id);
+    s.id = newId;
+
+    // rewrite choice links
+    if (Array.isArray(s.choices)) {
+      s.choices.forEach(ch => {
+        const tgt = Number(ch.nextSceneId);
+        if (oldToNew.has(tgt)) ch.nextSceneId = oldToNew.get(tgt);
+      });
+    }
+  });
+
+  // update activeSceneId to new mapping, fallback to 1
+  const mapped = oldToNew.get(Number(activeSceneId));
+  activeSceneId = mapped ? mapped : 1;
+}
+
+// Start a fresh project (clears autosave too)
+function newProject(){
+  const ok = confirm("새 프로젝트를 시작할까요?\n(현재 작업은 자동저장 포함 모두 초기화됩니다)");
+  if(!ok) return;
+
+  project = makeDefaultProject();
+  activeSceneId = 1;
+
+  // keep current UI settings if you want (optional) - here we reset to defaults:
+  syncTopSettingsToUI();
+  cleanPortraitOnlyOnLoad();
+  renderAll();
+  autosave();
+  setStatus("새 프로젝트 시작");
+}
+
+/* ===============================
+   Rules: portrait-only forbidden
+   Apply to:
+   - background/backgroundMobile
+   - titleFrame/titleFrameMobile
+=============================== */
+function portraitOnlyViolations(){
+  const badBg = [];
+  const badTf = [];
+  for(const s of project.scenes){
+    if(s.backgroundMobile && !s.background) badBg.push(s.id);
+    if(s.titleFrameMobile && !s.titleFrame) badTf.push(s.id);
+  }
+  return { badBg, badTf };
+}
+
+function validateNoPortraitOnly(action){
+  const { badBg, badTf } = portraitOnlyViolations();
+  if(badBg.length || badTf.length){
+    let msg = `${action} 불가:\n`;
+    if(badBg.length) msg += `- 세로 배경만 있는 장면: Scene ${badBg.join(", ")}\n`;
+    if(badTf.length) msg += `- 세로 타이틀프레임만 있는 장면: Scene ${badTf.join(", ")}\n`;
+    msg += `규칙: 가로만 또는 가로+세로만 허용됩니다.`;
+    alert(msg);
+    return false;
+  }
+  return true;
+}
+
+function cleanPortraitOnlyOnLoad(){
+  const { badBg, badTf } = portraitOnlyViolations();
+  if(badBg.length){
+    project.scenes.forEach(s=>{ if(s.backgroundMobile && !s.background) s.backgroundMobile=""; });
+  }
+  if(badTf.length){
+    project.scenes.forEach(s=>{ if(s.titleFrameMobile && !s.titleFrame) s.titleFrameMobile=""; });
+  }
+  if(badBg.length || badTf.length){
+    alert(`규칙 위반 자동정리:\n${badBg.length?("배경: "+badBg.join(", ")+"\n"):""}${badTf.length?("타이틀프레임: "+badTf.join(", ")): ""}`);
+  }
+}
+
+/* ===============================
+   UI: Tabs
+=============================== */
+function setTab(tab){
+  const isGame = tab==="game";
+  $("panelGame").classList.toggle("hidden", !isGame);
+  $("panelVisual").classList.toggle("hidden", isGame);
+
+  $("tabGame").className = isGame
+    ? "flex-1 py-2 rounded bg-pink-600 text-sm font-bold"
+    : "flex-1 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm font-bold";
+  $("tabVisual").className = !isGame
+    ? "flex-1 py-2 rounded bg-pink-600 text-sm font-bold"
+    : "flex-1 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm font-bold";
+}
+
+/* ===============================
+   Scene Ops
+=============================== */
+function getActiveScene(){
+  return project.scenes.find(s=>s.id===activeSceneId);
+}
+
+function addScene(){
+  const id = project.scenes.length ? Math.max(...project.scenes.map(s=>s.id))+1 : 1;
+  project.scenes.push({
+    id,
+    type: "normal",
+    background: "", backgroundMobile: "",
+    titleFrame: "", titleFrameMobile: "",
+    titleText: "", subtitleText: "",
+    safeAreaPos: "center",
+    frameIntensity: "subtle",
+    script: [{ speaker: "???", text: "...", motion: "", charImg: "" }],
+    choices: []
+  });
+  activeSceneId = id;
+  renderAll();
+  autosave();
+  setStatus("새 장면 추가");
+}
+
+function moveScene(index, dir){
+  if(index+dir<0 || index+dir>=project.scenes.length) return;
+  const t = project.scenes[index];
+  project.scenes[index] = project.scenes[index+dir];
+  project.scenes[index+dir] = t;
+  renderSceneList();
+  autosave();
+}
+
+function dupScene(index){
+  const src = project.scenes[index];
+  const id = Math.max(...project.scenes.map(s=>s.id))+1;
+  const copy = JSON.parse(JSON.stringify(src));
+  copy.id = id;
+  project.scenes.splice(index+1,0,copy);
+  activeSceneId = id;
+  renderAll();
+  autosave();
+}
+
+function delScene(index){
+  if(project.scenes.length<=1) return alert("최소 1개");
+  if(!confirm("삭제?")) return;
+  project.scenes.splice(index,1);
+  // keep ids stable and ensure Scene 1 exists
+  reindexScenes();
+  renderAll();
+  autosave();
+}
+
+/* ===============================
+   Render: Scene list & Editor
+=============================== */
+function renderSceneList(){
+  const root = $("sceneList");
+  root.innerHTML = "";
+
+  project.scenes.forEach((s, idx)=>{
+    const isActive = s.id===activeSceneId;
+    const row = document.createElement("div");
+    row.className = `p-2 rounded border mb-2 flex flex-col gap-2 ${isActive ? "bg-pink-900/40 border-pink-500" : "bg-gray-800 border-gray-700 hover:bg-gray-700"}`;
+
+    const header = document.createElement("div");
+    header.className = "flex justify-between items-center cursor-pointer";
+    header.onclick = ()=>{ activeSceneId=s.id; renderAll(); };
+
+    const pv = escapeHtml(s.type==="title" ? (s.titleText||"(타이틀)") : (s.script?.[0]?.text||"..."));
+    header.innerHTML = `
+      <div class="flex items-center gap-2 overflow-hidden">
+        <span class="text-xs font-bold ${isActive?"text-pink-300":"text-gray-400"} min-w-[70px]">Scene ${s.id}</span>
+        <span class="text-[10px] text-gray-500 truncate">${pv}</span>
+      </div>
+      <span class="text-[10px] ${s.type==="title"?"text-purple-300":"text-gray-500"}">${s.type==="title"?"TITLE":"NORMAL"}</span>
+    `;
+
+    const controls = document.createElement("div");
+    controls.className = "flex justify-end gap-1 border-t border-gray-700/50 pt-1";
+    const btn = "px-2 py-0.5 rounded text-[9px] bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600";
+    if(idx>0) controls.innerHTML += `<button class="${btn}" data-act="up">↑</button>`;
+    if(idx<project.scenes.length-1) controls.innerHTML += `<button class="${btn}" data-act="down">↓</button>`;
+    controls.innerHTML += `<button class="${btn} text-blue-300" data-act="dup">복</button>`;
+    if(project.scenes.length>1) controls.innerHTML += `<button class="${btn} text-red-300" data-act="del">삭제</button>`;
+
+    controls.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      const act = e.target.closest("button")?.dataset?.act;
+      if(!act) return;
+      if(act==="up") moveScene(idx,-1);
+      if(act==="down") moveScene(idx,1);
+      if(act==="dup") dupScene(idx);
+      if(act==="del") delScene(idx);
+    });
+
+    row.appendChild(header);
+    row.appendChild(controls);
+    root.appendChild(row);
+  });
+}
+
+function renderEditor(){
+  const s = getActiveScene();
+  if(!s) return;
+
+  $("activeSceneBadge").textContent = `Scene ${s.id}`;
+  $("activeSceneBadge").className = `bg-pink-600 px-2 py-1 rounded text-xs`;
+
+  // type
+  $("sceneType").value = s.type || "normal";
+  $("titleText").value = s.titleText || "";
+  $("subtitleText").value = s.subtitleText || "";
+  $("safeAreaPos").value = s.safeAreaPos || "center";
+  $("frameIntensity").value = s.frameIntensity || "subtle";
+
+  // previews
+  $("prevLand").style.backgroundImage = s.background ? `url('${s.background}')` : "none";
+  const portPrev = $("prevPort");
+  portPrev.style.backgroundImage = s.backgroundMobile ? `url('${s.backgroundMobile}')` : (s.background ? `url('${s.background}')` : "none");
+  portPrev.textContent = s.backgroundMobile ? "" : (s.background ? "PC" : "");
+
+  $("prevTLand").style.backgroundImage = s.titleFrame ? `url('${s.titleFrame}')` : "none";
+  const tPortPrev = $("prevTPort");
+  tPortPrev.style.backgroundImage = s.titleFrameMobile ? `url('${s.titleFrameMobile}')` : (s.titleFrame ? `url('${s.titleFrame}')` : "none");
+  tPortPrev.textContent = s.titleFrameMobile ? "" : (s.titleFrame ? "PC" : "");
+
+  // script list
+  const scriptRoot = $("scriptList");
+  scriptRoot.innerHTML = "";
+  (s.script||[]).forEach((line,i)=>{
+    const div = document.createElement("div");
+    div.className = "flex gap-2 items-start bg-gray-800/40 p-2 rounded border border-gray-700";
+    div.innerHTML = `
+      <div class="flex flex-col gap-2 w-1/4 min-w-[110px]">
+        <input class="w-full rounded border px-2 py-1 text-xs text-yellow-300 font-bold"
+               placeholder="화자" value="${escapeAttr(line.speaker)}">
+        <select class="rounded border px-2 py-1 text-[10px]">
+          <option value="" ${line.motion===''?'selected':''}>모션 없음</option>
+          <option value="jump" ${line.motion==='jump'?'selected':''}>jump</option>
+          <option value="shake" ${line.motion==='shake'?'selected':''}>shake</option>
+          <option value="zoom" ${line.motion==='zoom'?'selected':''}>zoom</option>
+        </select>
+<label class="file-input-wrapper w-full bg-gray-700 hover:bg-gray-600 text-center py-1 rounded border border-gray-600 text-[10px] text-gray-200">
+  <span>캐릭터 이미지</span>
+  <input type="file" accept="image/*" data-char-upload="1">
+</label>
+<div class="text-[10px] text-gray-500 truncate" data-char-status="1">없음</div>
+
+      </div>
+      <div class="flex-1 relative">
+        <textarea class="w-full rounded border px-2 py-1 text-sm resize-none h-24 leading-relaxed" placeholder="대사"></textarea>
+        ${(s.script.length>1)?`<button class="absolute top-1 right-1 w-6 h-6 bg-gray-700 text-gray-300 hover:bg-red-900/50 hover:text-red-300 rounded" data-del="${i}">−</button>`:""}
+      </div>
+    `;
+    const speakerInput = div.querySelector("input");
+    const motionSel = div.querySelector("select");
+    const ta = div.querySelector("textarea");
+    ta.value = String(line.text??"");
+const up = div.querySelector('input[type="file"][data-char-upload="1"]');
+const st = div.querySelector('[data-char-status="1"]');
+
+st.textContent = line.charImg ? "설정됨" : "없음";
+
+up.addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  line.charImg = await readFileAsDataURL(f);
+  st.textContent = "설정됨";
+  autosave();
+  e.target.value = "";
+});
+
+    speakerInput.addEventListener("input", ()=>{ line.speaker = speakerInput.value; autosave(); });
+    motionSel.addEventListener("change", ()=>{ line.motion = motionSel.value; autosave(); });
+    ta.addEventListener("input", ()=>{ line.text = ta.value; autosave(); });
+
+    div.addEventListener("click",(e)=>{
+      const delIdx = e.target.closest("button")?.dataset?.del;
+      if(delIdx!==undefined){
+        s.script.splice(Number(delIdx),1);
+        renderEditor();
+        autosave();
+      }
+    });
+
+    scriptRoot.appendChild(div);
+  });
+
+  // choices
+  const choiceRoot = $("choiceList");
+  choiceRoot.innerHTML = "";
+  (s.choices||[]).forEach((c,i)=>{
+    const exists = project.scenes.some(x=>x.id===Number(c.nextSceneId));
+    const div = document.createElement("div");
+    div.className = "flex gap-2 items-center bg-gray-900 p-2 rounded border border-gray-700";
+    div.innerHTML = `
+      <input class="flex-1 rounded border px-2 py-1 text-xs" value="${escapeAttr(c.text)}" placeholder="선택지 텍스트">
+      <input type="number" class="w-16 rounded border px-2 py-1 text-xs text-center ${exists?'border-gray-600':'border-red-500'}" value="${Number(c.nextSceneId)||0}">
+      <button class="px-2 text-gray-400 hover:text-red-400" data-del="${i}">×</button>
+    `;
+    const inpText = div.querySelectorAll("input")[0];
+    const inpNext = div.querySelectorAll("input")[1];
+    inpText.addEventListener("input", ()=>{ c.text = inpText.value; autosave(); });
+    inpNext.addEventListener("input", ()=>{ c.nextSceneId = parseInt(inpNext.value)||0; autosave(); renderEditor(); });
+    div.querySelector("button").addEventListener("click", ()=>{
+      s.choices.splice(i,1);
+      renderEditor();
+      autosave();
+    });
+    choiceRoot.appendChild(div);
+  });
+
+  // disable script/choices if title type? (still editable but preview will ignore)
+  const isTitle = s.type==="title";
+  $("btnAddLine").disabled = isTitle;
+  $("btnAddChoice").disabled = isTitle;
+  $("btnAddLine").classList.toggle("opacity-50", isTitle);
+  $("btnAddChoice").classList.toggle("opacity-50", isTitle);
+}
+
+/* ===============================
+   Game Maker: Input wiring
+=============================== */
+function wireGameInputs(){
+  // scene type
+  $("sceneType").addEventListener("change", ()=>{
+    const s = getActiveScene();
+    s.type = $("sceneType").value;
+    autosave();
+    renderSceneList();
+  });
+
+  $("titleText").addEventListener("input", ()=>{
+    const s = getActiveScene();
+    s.titleText = $("titleText").value;
+    autosave();
+    renderSceneList();
+  });
+
+  $("subtitleText").addEventListener("input", ()=>{
+    const s = getActiveScene();
+    s.subtitleText = $("subtitleText").value;
+    autosave();
+  });
+
+  $("safeAreaPos").addEventListener("change", ()=>{
+    const s = getActiveScene();
+    s.safeAreaPos = $("safeAreaPos").value;
+    autosave();
+  });
+
+  $("frameIntensity").addEventListener("change", ()=>{
+    const s = getActiveScene();
+    s.frameIntensity = $("frameIntensity").value;
+    autosave();
+  });
+
+  // bg uploads
+  $("bgLandFile").addEventListener("change", async (e)=>{
+    const s = getActiveScene();
+    const f = e.target.files[0];
+    if(!f) return;
+    s.background = await readFileAsDataURL(f);
+    renderEditor();
+    autosave();
+  });
+
+  $("bgPortFile").addEventListener("change", async (e)=>{
+    const s = getActiveScene();
+    const f = e.target.files[0];
+    if(!f) return;
+    // rule: portrait-only forbidden
+    if(!s.background){
+      alert("세로 배경만 단독은 불가능합니다.\n먼저 가로 배경을 업로드하세요.");
+      e.target.value="";
+      return;
+    }
+    s.backgroundMobile = await readFileAsDataURL(f);
+    renderEditor();
+    autosave();
+  });
+
+  // title frame uploads
+  $("tLandFile").addEventListener("change", async (e)=>{
+    const s = getActiveScene();
+    const f = e.target.files[0];
+    if(!f) return;
+    s.titleFrame = await readFileAsDataURL(f);
+    renderEditor();
+    autosave();
+  });
+
+  $("tPortFile").addEventListener("change", async (e)=>{
+    const s = getActiveScene();
+    const f = e.target.files[0];
+    if(!f) return;
+    // rule
+    if(!s.titleFrame){
+      alert("세로 타이틀프레임만 단독은 불가능합니다.\n먼저 가로 타이틀프레임을 업로드하세요.");
+      e.target.value="";
+      return;
+    }
+    s.titleFrameMobile = await readFileAsDataURL(f);
+    renderEditor();
+    autosave();
+  });
+
+  // add line/choice
+  $("btnAddLine").addEventListener("click", ()=>{
+    const s = getActiveScene();
+    if(s.type==="title") return;
+    const last = s.script[s.script.length-1];
+s.script.push({ speaker: last?last.speaker:"???", text:"", motion:"", charImg:"" });
+
+    renderEditor();
+    autosave();
+  });
+
+  $("btnAddChoice").addEventListener("click", ()=>{
+    const s = getActiveScene();
+    if(s.type==="title") return;
+    s.choices = s.choices || [];
+    const next = getNextSceneId(s.id) ?? 0;
+    s.choices.push({ text: "선택지", nextSceneId: next });
+    renderEditor();
+    autosave();
+  });
+}
+
+function getNextSceneId(id){
+  const ids = project.scenes.map(s=>s.id);
+  const i = ids.indexOf(id);
+  return (i>=0 && i<ids.length-1) ? ids[i+1] : null;
+}
+
+/* ===============================
+   Save/Load/Export
+=============================== */
+function downloadBlob(blob, filename){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+
+function saveProject(){
+  if(!validateNoPortraitOnly("저장")) return;
+  project.name = $("projectName").value || "MyVN";
+  project.settings.gameTitle = $("gameTitle").value || "My Visual Novel";
+  const blob = new Blob([JSON.stringify(project,null,2)], {type:"application/json"});
+  downloadBlob(blob, `${project.name}.json`);
+  setStatus("프로젝트 저장");
+}
+
+function loadProjectFromText(text){
+  const p = JSON.parse(text);
+  if(!p || !Array.isArray(p.scenes) || !p.scenes.length) throw new Error("프로젝트 구조 오류");
+  project = p;
+  if(!project.settings) project.settings = { font:"sans", titleStyle:"glow", gameTitle:"My Visual Novel" };
+
+  // block neon if someone put it
+  if(String(project.settings.titleStyle||"").toLowerCase()==="neon") project.settings.titleStyle = "glow";
+
+  activeSceneId = project.scenes[0].id;
+  cleanPortraitOnlyOnLoad();
+  reindexScenes();
+  syncTopSettingsToUI();
+  renderAll();
+  autosave();
+  setStatus("프로젝트 로드");
+}
+
+function exportDataJson(){
+  if(!validateNoPortraitOnly("내보내기")) return;
+  const data = {
+    meta: {
+      gameTitle: $("gameTitle").value || "My Visual Novel",
+      font: $("fontSel").value || "sans",
+      titleStyle: $("titleStyleSel").value || "glow"
+    },
+    scenes: project.scenes
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+  downloadBlob(blob, "data.json");
+  setStatus("data.json 내보내기");
+}
+
+function syncTopSettingsToUI(){
+  $("projectName").value = project.name || "MyVN";
+  $("gameTitle").value = project.settings?.gameTitle || "My Visual Novel";
+  $("fontSel").value = project.settings?.font || "sans";
+  $("titleStyleSel").value = project.settings?.titleStyle || "glow";
+}
+
+function bindTopSettings(){
+  $("projectName").addEventListener("input", ()=>{
+    project.name = $("projectName").value;
+    autosave();
+  });
+  $("gameTitle").addEventListener("input", ()=>{
+    if(!project.settings) project.settings = {};
+    project.settings.gameTitle = $("gameTitle").value;
+    autosave();
+  });
+  $("fontSel").addEventListener("change", ()=>{
+    if(!project.settings) project.settings = {};
+    project.settings.font = $("fontSel").value;
+    autosave();
+  });
+  $("titleStyleSel").addEventListener("change", ()=>{
+    const v = String($("titleStyleSel").value||"").toLowerCase();
+    if(v==="neon"){
+      alert("네온은 제외되었습니다.");
+      $("titleStyleSel").value = "glow";
+      return;
+    }
+    if(!project.settings) project.settings = {};
+    project.settings.titleStyle = v;
+    autosave();
+  });
+}
+
+/* ===============================
+   Preview
+=============================== */
+function openPreview(){
+  if(!validateNoPortraitOnly("미리보기")) return;
+  $("previewOverlay").classList.remove("hidden");
+  reloadPreview();
+}
+
+function closePreview(){
+  $("previewOverlay").classList.add("hidden");
+  $("gameFrame").src = "";
+  if(previewUrl){ URL.revokeObjectURL(previewUrl); previewUrl=null; }
+}
+
+function setPreviewMode(mode){
+  previewMode = mode;
+  const c = $("preview-frame-container");
+  if(mode==="landscape"){
+    c.className="mode-landscape bg-black relative";
+    $("btnLand").className="px-3 py-1 rounded-full text-xs font-bold bg-pink-600 text-white";
+    $("btnPort").className="px-3 py-1 rounded-full text-xs font-bold text-gray-300 hover:text-white";
+  }else{
+    c.className="mode-portrait bg-black relative";
+    $("btnLand").className="px-3 py-1 rounded-full text-xs font-bold text-gray-300 hover:text-white";
+    $("btnPort").className="px-3 py-1 rounded-full text-xs font-bold bg-pink-600 text-white";
+  }
+  reloadPreview();
+}
+
+function reloadPreview(){
+  if(!validateNoPortraitOnly("미리보기")) return;
+
+  const data = {
+    meta: {
+      gameTitle: $("gameTitle").value || "My Visual Novel",
+      font: $("fontSel").value || "sans",
+      titleStyle: $("titleStyleSel").value || "glow"
+    },
+    scenes: JSON.parse(JSON.stringify(project.scenes))
+  };
+
+  const html = buildRuntimeHTML(data, previewMode);
+  const blob = new Blob([html], {type:"text/html"});
+  if(previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl = URL.createObjectURL(blob);
+  $("gameFrame").src = previewUrl;
+}
+
+function buildRuntimeHTML(DATA, forcedMode){
+  const safeData = JSON.stringify(DATA);
+
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>VN Preview</title>
+<style>
+  body{margin:0;background:#000;overflow:hidden;user-select:none}
+  #game{position:relative;width:100vw;height:100vh;background:#000;overflow:hidden}
+  #bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%;transform:scale(1.001);pointer-events:none;z-index:0}
+    #char{
+      position:absolute;
+      left:50%;
+      bottom:0;
+      transform:translateX(-50%);
+      height:90vh;
+      max-width:100%;
+      object-fit:contain;
+      z-index:15;
+      pointer-events:none;
+      transition:.15s ease;
+    }
+    @media (orientation:portrait){
+      #char{height:75vh; bottom:10vh;}
+    }
+    .anim-jump{ animation: jump .4s ease; }
+    .anim-shake{ animation: shake .4s ease; }
+    .anim-zoom{ transform: translateX(-50%) scale(1.12) !important; }
+    @keyframes jump{
+      0%,100%{ transform:translateX(-50%) translateY(0); }
+      50%{ transform:translateX(-50%) translateY(-30px); }
+    }
+    @keyframes shake{
+      0%,100%{ transform:translateX(-50%); }
+      25%{ transform:translateX(-55%); }
+      75%{ transform:translateX(-45%); }
+    }
+  .hidden{display:none!important}
+
+  /* title / name */
+  #title-screen,#name-input{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;background:#111;padding:8vh 6vw}
+  #title-screen h1{font-size:3rem;margin:0 0 22px;letter-spacing:.08em}
+  #title-screen p{margin:0 0 18px;opacity:.7;font-size:12px;white-space:pre-wrap;max-width:520px;line-height:1.5}
+  .btn{padding:14px 38px;font-size:1.1rem;margin:8px;border-radius:30px;border:none;cursor:pointer;font-weight:800;width:220px;font-family:inherit}
+  .btn-start{background:linear-gradient(45deg,#ec4899,#f43f5e);color:#fff}
+  .btn-load{background:transparent;border:2px solid #fff;color:#fff}
+  input[type=text]{padding:14px;font-size:1.2rem;text-align:center;border-radius:14px;border:2px solid #555;background:#222;color:#fff;margin-bottom:16px;width:80%;max-width:320px;font-family:inherit}
+
+  /* chapter layer */
+  #chapter{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8vh 6vw}
+  #chapter.top{justify-content:flex-start;padding-top:10vh}
+  #chTitle{font-size:clamp(28px,6vw,72px);font-weight:900;letter-spacing:.08em}
+  #chSub{margin-top:12px;font-size:clamp(14px,2.2vw,24px);opacity:.9;letter-spacing:.12em}
+  #chHint{margin-top:24px;font-size:12px;opacity:.55}
+
+  /* dialogue ui */
+  #ui{position:absolute;left:0;right:0;bottom:0;z-index:20;padding:18px;box-sizing:border-box;background:linear-gradient(to top,rgba(0,0,0,.9),transparent);min-height:25vh;display:flex;flex-direction:column;justify-content:flex-end}
+  #name{color:#fbbf24;font-size:1.25rem;font-weight:900;margin-bottom:8px;text-shadow:1px 1px 2px #000}
+  #text{background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.18);border-radius:15px;padding:18px;color:#fff;font-size:1.1rem;line-height:1.6;min-height:96px;white-space:pre-wrap}
+
+  #choices{position:absolute;inset:0;z-index:45;background:rgba(0,0,0,.82);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px}
+  .choice{width:100%;max-width:420px;padding:18px;font-size:1.05rem;border-radius:15px;border:none;background:#fff;color:#000;font-weight:900;cursor:pointer}
+  .choice:active{transform:scale(.98);background:#fbbf24}
+
+  /* title styles (NO neon) */
+  .ts-minimal #chTitle{ text-shadow:none; opacity:.95; }
+  .ts-glow #chTitle{ text-shadow:0 0 14px rgba(255,255,255,.35), 0 0 36px rgba(236,72,153,.35); }
+  .ts-paper #chTitle{ text-shadow:2px 2px 0 rgba(0,0,0,.8); filter:contrast(1.1); }
+  .ts-romantic #chTitle{ text-shadow:0 0 18px rgba(244,114,182,.45), 0 0 42px rgba(251,113,133,.25); }
+  .ts-sleek #chTitle{ letter-spacing:.18em; text-shadow:0 0 10px rgba(255,255,255,.18); }
+  .ts-classic #chTitle{ letter-spacing:.06em; text-shadow:1px 2px 0 rgba(0,0,0,.75), 0 0 18px rgba(255,255,255,.18); }
+  .ts-sparkle #chTitle{ text-shadow:0 0 10px rgba(255,255,255,.25), 0 0 28px rgba(236,72,153,.25); }
+  .ts-outline #chTitle{ text-shadow: 2px 2px 0 rgba(0,0,0,.85), -2px 2px 0 rgba(0,0,0,.85), 2px -2px 0 rgba(0,0,0,.85), -2px -2px 0 rgba(0,0,0,.85); }
+  /* NEW: gold */
+  .ts-gold #chTitle{
+    background: linear-gradient(180deg, #fff6cc 0%, #ffd26a 22%, #f7b733 48%, #ffd26a 72%, #fff2b0 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow:
+      0 2px 0 rgba(0,0,0,.55),
+      0 0 22px rgba(255,210,106,.22),
+      0 0 46px rgba(247,183,51,.14);
+    letter-spacing: .10em;
+  }
+
+  /* NEW: glass */
+  .ts-glass #chTitle{
+    color: rgba(255,255,255,.88);
+    text-shadow:
+      0 2px 0 rgba(0,0,0,.55),
+      0 0 26px rgba(255,255,255,.16);
+    position: relative;
+  }
+  .ts-glass #chTitle::after{
+    content: "";
+    position: absolute;
+    left: -6%;
+    top: 10%;
+    width: 112%;
+    height: 60%;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,0));
+    transform: skewX(-18deg);
+    filter: blur(0.2px);
+    opacity: .75;
+  }
+
+  /* NEW: luxury (고급, 은은한 고급감) */
+  .ts-luxury #chTitle{
+    color: rgba(255,255,255,.94);
+    letter-spacing: .16em;
+    text-shadow:
+      0 2px 0 rgba(0,0,0,.60),
+      0 0 18px rgba(255,255,255,.12),
+      0 0 40px rgba(236,72,153,.10);
+  }
+  .ts-luxury #chTitle{
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 10px;
+    text-decoration-color: rgba(255,255,255,.22);
+  }
+
+  /* NEW: subtle (은은) */
+  .ts-subtle #chTitle{
+    color: rgba(255,255,255,.92);
+    letter-spacing: .08em;
+    text-shadow:
+      0 1px 0 rgba(0,0,0,.55),
+      0 0 10px rgba(255,255,255,.10);
+    opacity: .95;
+  }
+
+  @media (orientation:portrait){
+    #title-screen h1{font-size:2.4rem}
+    #ui{min-height:30vh;padding:14px}
+    #text{font-size:1.02rem;padding:14px}
+    #name{font-size:1.12rem}
+  }
+</style></head><body>
+<div id="game" onclick="next()">
+  <img id="bg"/>
+<img id="char" class="hidden" />
+  <div id="title-screen">
+    <h1 id="gameTitle"></h1>
+    <p id="fatal" class="hidden" style="color:#fca5a5"></p>
+    <button class="btn btn-start" onclick="showName(event)">Start</button>
+    <button id="btnCont" class="btn btn-load" onclick="loadSave(event)" style="display:none">Continue</button>
+  </div>
+  <div id="name-input" class="hidden">
+    <h2 style="margin:0 0 14px">이름을 입력해주세요</h2>
+    <input type="text" id="pn" placeholder="이름" maxlength="8">
+    <button class="btn btn-start" onclick="start(event)">OK</button>
+  </div>
+
+  <div id="chapter" class="hidden">
+    <div id="chTitle"></div>
+    <div id="chSub"></div>
+    <div id="chHint">Tap to continue</div>
+  </div>
+
+  <div id="choices"></div>
+  <div id="ui" class="hidden"><div id="name"></div><div id="text"></div></div>
+</div>
+
+<script>
+  const DATA = ${safeData};
+  const meta = DATA.meta || {};
+  const scenes = Array.isArray(DATA.scenes) ? DATA.scenes : [];
+  let cur=null, idx=0, pn="Player", ty=false, tm=null, ft="", isPort=false;
+  const KEY="VN_ONEFILE_SAVE";
+
+    function getStartSceneId(){
+      // Scene 1이 title이면: OK 후 Scene 2로 진입(없으면 Scene1)
+      if(scenes[0] && scenes[0].type==="title"){
+        return (scenes[1] && scenes[1].id) ? scenes[1].id : scenes[0].id;
+      }
+      return (scenes[0] && scenes[0].id) ? scenes[0].id : 1;
+    }
+
+
+  function fontFamily(font){
+    if(font==="serif") return "'Batang', serif";
+    if(font==="cursive") return "'Gaegu', cursive";
+    return "'Apple SD Gothic Neo','Malgun Gothic',sans-serif";
+  }
+  document.body.style.fontFamily = fontFamily(String(meta.font||"sans"));
+
+  function validate(){
+    const badBg = scenes.filter(s=>s.backgroundMobile && !s.background).map(s=>s.id);
+    const badTf = scenes.filter(s=>s.titleFrameMobile && !s.titleFrame).map(s=>s.id);
+    if(badBg.length || badTf.length){
+      const f=document.getElementById("fatal");
+      let msg="실행 불가: 세로만 단독인 항목이 있습니다.\\n";
+      if(badBg.length) msg += "- 배경: Scene " + badBg.join(", ") + "\\n";
+      if(badTf.length) msg += "- 타이틀프레임: Scene " + badTf.join(", ") + "\\n";
+      f.textContent=msg;
+      f.classList.remove("hidden");
+      document.querySelectorAll(".btn").forEach(b=>b.disabled=true);
+      return false;
+    }
+    return true;
+  }
+
+  function applyTitleStyle(){
+    const st = String(meta.titleStyle||"glow").toLowerCase();
+    const ch = document.getElementById("chapter");
+    ch.className = ch.className.replace(/\\bts-\\w+\\b/g,"").trim();
+    ch.classList.add("ts-" + (st==="neon" ? "glow" : st));
+  }
+
+  function checkOrient(){
+    const forced = "${forcedMode}";
+    if(forced==="portrait") isPort=true;
+    else if(forced==="landscape") isPort=false;
+    else isPort = window.innerHeight > window.innerWidth;
+    if(cur) setBg();
+  }
+  window.addEventListener("resize", checkOrient);
+
+  function pickSrc(land, port){
+    return isPort ? (port || land) : (land || port);
+  }
+
+  function setBg(){
+    if(!cur) return;
+    const isTitle = cur.type==="title";
+    const src = isTitle
+      ? pickSrc(cur.titleFrame, cur.titleFrameMobile) || pickSrc(cur.background, cur.backgroundMobile)
+      : pickSrc(cur.background, cur.backgroundMobile);
+    document.getElementById("bg").src = src || "";
+  }
+
+  function showName(e){
+    e.stopPropagation();
+    document.getElementById("title-screen").classList.add("hidden");
+    document.getElementById("name-input").classList.remove("hidden");
+  }
+  function start(e){
+    e.stopPropagation();
+    pn = document.getElementById("pn").value.trim() || "Player";
+    document.getElementById("name-input").classList.add("hidden");
+    document.getElementById("ui").classList.remove("hidden");
+    loadScene(getStartSceneId());
+  }
+
+  function checkSave(){
+    if(localStorage.getItem(KEY)) document.getElementById("btnCont").style.display="block";
+  }
+  function loadSave(e){
+    e.stopPropagation();
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return;
+    const s = JSON.parse(raw);
+    pn = s.name || pn;
+    document.getElementById("title-screen").classList.add("hidden");
+    document.getElementById("ui").classList.remove("hidden");
+    loadScene(s.sid, s.lidx);
+  }
+
+  function loadScene(id, l=0){
+    cur = scenes.find(s=>s.id===id);
+    if(!cur) return alert("End");
+    setBg();
+
+    // title scene
+    if(cur.type==="title"){
+      document.getElementById("ui").classList.add("hidden");
+      document.getElementById("choices").style.display="none";
+
+      const ch = document.getElementById("chapter");
+      ch.classList.remove("hidden");
+      ch.classList.toggle("top", (cur.safeAreaPos||"center")==="top");
+      document.getElementById("chTitle").textContent = cur.titleText || "";
+      document.getElementById("chSub").textContent = cur.subtitleText || "";
+      idx = 0;
+      localStorage.setItem(KEY, JSON.stringify({sid:cur.id, lidx:0, name:pn}));
+      return;
+    }
+
+    document.getElementById("chapter").classList.add("hidden");
+    document.getElementById("ui").classList.remove("hidden");
+
+    idx = l;
+    playLine();
+  }
+
+  function playLine(){
+    localStorage.setItem(KEY, JSON.stringify({sid:cur.id, lidx:idx, name:pn}));
+    const l = (cur.script||[])[idx] || {speaker:"",text:""};
+    // 캐릭터 이미지 표시
+    const chImg = document.getElementById("char");
+    chImg.className = "hidden";
+    if(l.charImg){
+      chImg.src = l.charImg;
+      chImg.classList.remove("hidden");
+      if(l.motion){
+        chImg.classList.add("anim-" + l.motion);
+        void chImg.offsetWidth;
+      }
+    }
+    document.getElementById("name").innerText = String(l.speaker||"").replace("{{player}}", pn);
+    ft = String(l.text||"").replace("{{player}}", pn);
+
+    const tb = document.getElementById("text");
+    tb.textContent = "";
+    ty = true;
+    let i=0;
+    if(tm) clearInterval(tm);
+    tm = setInterval(()=>{
+      tb.textContent += ft.charAt(i++);
+      if(i>=ft.length){ clearInterval(tm); ty=false; }
+    }, 28);
+  }
+
+  function loadNext(){
+    const ci = scenes.findIndex(s=>cur && s && s.id===cur.id);
+    const next = (ci>=0) ? scenes[ci+1] : null;
+    if(next) loadScene(next.id);
+    else alert("End");
+  }
+
+  function next(){
+    if(!validate()) return;
+
+    if(!document.getElementById("title-screen").classList.contains("hidden")) return;
+    if(!document.getElementById("name-input").classList.contains("hidden")) return;
+    if(document.getElementById("choices").style.display==="flex") return;
+
+    if(cur && cur.type==="title"){
+      document.getElementById("chapter").classList.add("hidden");
+      loadNext();
+      return;
+    }
+
+    const tb = document.getElementById("text");
+    if(ty){ clearInterval(tm); tb.textContent = ft; ty=false; return; }
+
+    if(idx < (cur.script||[]).length - 1){
+      idx++; playLine();
+    } else {
+      if(cur.choices && cur.choices.length){
+        const b = document.getElementById("choices");
+        b.innerHTML = "";
+        b.style.display = "flex";
+        cur.choices.forEach(ch=>{
+          const btn = document.createElement("button");
+          btn.className = "choice";
+          btn.innerText = String(ch.text||"").replace("{{player}}", pn);
+          btn.onclick = (e)=>{
+            e.stopPropagation();
+            b.style.display="none";
+            loadScene(Number(ch.nextSceneId)||0);
+          };
+          b.appendChild(btn);
+        });
+      } else loadNext();
+    }
+  }
+
+  (function init(){
+    const first = scenes[0];
+    // Scene 1이 title이면: 타이틀 화면을 Scene1 기반으로 표시(프레임 배경 + 타이틀 텍스트)
+    if(first && first.type==="title"){
+      cur = first;
+    }
+    document.getElementById("gameTitle").textContent = meta.gameTitle || "My Visual Novel";
+    applyTitleStyle();
+    checkOrient();
+    checkSave();
+    validate();
+
+    if(first && first.type==="title"){
+      // 방향 계산 후 배경 적용
+      setBg();
+      document.getElementById("gameTitle").textContent = first.titleText || (meta.gameTitle || "My Visual Novel");
+    }
+  })();
+<\/script></body></html>`;
+}
+
+/* ===============================
+   Visual Maker
+=============================== */
+function stylePack(key){
+  switch(key){
+    case "anime_clean": return "clean anime background, crisp linework, high detail, soft global illumination";
+    case "anime_pastel": return "pastel anime background, soft shading, gentle bloom, cozy atmosphere";
+    case "semi_real": return "semi-realistic background, cinematic lighting, high detail, natural materials";
+    case "toon_flat": return "flat toon background, clean shapes, simple shading, strong readability";
+    case "pixel_art": return "pixel art background, 16-bit style, detailed tiles, readable shapes";
+    default: return "high quality background";
+  }
+}
+
+function vmNeg(){
+  return [
+    "people","character","face","hands",
+    "watermark","logo",
+    "readable text","letters","words","signage"
+  ].join(", ");
+}
+
+function vmSafePos(){
+  return document.querySelector('input[name="vmSafe"]:checked')?.value || "center";
+}
+
+function vmBuildPrompt(aspect){
+  const place = ($("vmPlace").value||"").trim();
+  const tw = ($("vmTime").value||"").trim();
+  const obj = ($("vmObj").value||"").trim();
+  const mood = ($("vmMood").value||"").trim();
+  const style = stylePack($("vmStyle").value);
+  const titleFrame = $("vmTitleFrame").checked;
+  const safe = vmSafePos();
+  const orn = ($("vmOrn").value||"").trim();
+  const ornInt = $("vmOrnInt").value || "subtle";
+
+  if(!place) return "";
+
+  const aspectHint = (aspect==="land")
+    ? "16:9 landscape, wide establishing shot"
+    : "9:16 portrait, vertical composition, keep focal area centered";
+
+  const bits = [];
+  if(titleFrame){
+    bits.push("Ornamental title card frame background for a visual novel.");
+    bits.push(`location theme: ${place}.`);
+    if(tw) bits.push(`time/weather vibe: ${tw}.`);
+    if(mood) bits.push(`mood: ${mood}.`);
+    bits.push(aspectHint + ".");
+    bits.push("NO text, NO letters, NO words. Decorative frame only.");
+    bits.push(safe==="center"
+      ? "Leave a large EMPTY safe area in the CENTER for title text overlay."
+      : "Leave a large EMPTY safe area at the TOP for title text overlay.");
+    bits.push(`ornament intensity: ${ornInt}.`);
+    if(orn) bits.push(`ornament hint: ${orn}.`);
+    bits.push("Symmetrical composition, strong readability of empty area.");
+    bits.push(style + ".");
+  } else {
+    bits.push("Background illustration for a visual novel scene (empty background only).");
+    bits.push(`location: ${place}.`);
+    if(tw) bits.push(`time/weather: ${tw}.`);
+    if(mood) bits.push(`mood: ${mood}.`);
+    bits.push(aspectHint + ".");
+    bits.push("Empty scene: no characters, no people, no readable text, no signage. Clear depth and readable composition.");
+    if(obj) bits.push(`key objects: ${obj}.`);
+    bits.push(style + ".");
+  }
+  return bits.join(" ");
+}
+
+
+function vmMockSvg(label, w, h){
+  const safe = String(label||"").slice(0,60).replace(/[<>]/g,"");
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+    <defs>
+      <linearGradient id="g" x1="0" x2="1">
+        <stop offset="0" stop-color="#0f172a"/>
+        <stop offset="1" stop-color="#22c55e"/>
+      </linearGradient>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#g)"/>
+    <circle cx="80%" cy="30%" r="${Math.round(Math.min(w,h)*0.16)}" fill="rgba(255,255,255,0.12)"/>
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+      font-size="${Math.round(Math.min(w,h)*0.06)}" fill="rgba(255,255,255,0.92)"
+      font-family="sans-serif">${safe}</text>
+    <text x="50%" y="62%" dominant-baseline="middle" text-anchor="middle"
+      font-size="${Math.round(Math.min(w,h)*0.028)}" fill="rgba(255,255,255,0.65)"
+      font-family="sans-serif">SVG preview (not AI)</text>
+  </svg>`;
+  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+}
+
+
+// ===============================
+// OpenAI Image Generation (browser direct)
+// Note: If this fails with CORS, set vmApiUrl to a local proxy URL.
+// Docs: /v1/images/generations supports sizes 1536x1024 (land) and 1024x1536 (port).
+// ===============================
+function vmSetApiStatus(msg){
+  const el = $("vmApiStatus");
+  if(el) el.textContent = msg || "";
+}
+
+function vmLoadApiSettings(){
+  try{
+    const k = localStorage.getItem("vm_openai_key") || "";
+    const u = localStorage.getItem("vm_openai_url") || "";
+    if($("vmApiKey")) $("vmApiKey").value = k;
+    if($("vmApiUrl") && u) $("vmApiUrl").value = u;
+  }catch(e){}
+}
+function vmSaveApiSettings(){
+  try{
+    if($("vmApiKey")) localStorage.setItem("vm_openai_key", $("vmApiKey").value || "");
+    if($("vmApiUrl")) localStorage.setItem("vm_openai_url", $("vmApiUrl").value || "");
+  }catch(e){}
+}
+
+function vmSizeFor(aspect){
+  return aspect === "land" ? "1536x1024" : aspect === "port" ? "1024x1536" : "1024x1024";
+}
+
+async function vmOpenAIImage(prompt, aspect){
+  const apiKey = ($("vmApiKey")?.value || "").trim();
+  const url = ($("vmApiUrl")?.value || "").trim();
+  const model = $("vmModel")?.value || "gpt-image-1.5";
+  const quality = $("vmQuality")?.value || "auto";
+  const output_format = $("vmOutFmt")?.value || "png";
+  const bg = $("vmBgSetting")?.value || "auto";
+
+  if(!apiKey){
+    throw new Error("API Key가 비어 있습니다.");
+  }
+  if(!url){
+    throw new Error("API URL이 비어 있습니다.");
+  }
+  if(!prompt){
+    throw new Error("프롬프트가 비어 있습니다.");
+  }
+
+  const body = {
+    model,
+    prompt,
+    size: vmSizeFor(aspect),
+    quality: quality === "auto" ? undefined : quality,
+    output_format
+  };
+  if(bg !== "auto") body.background = bg;
+
+  // remove undefined
+  Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + apiKey
+    },
+    body: JSON.stringify(body)
+  });
+
+  const text = await res.text();
+  let json = null;
+  try{ json = JSON.parse(text); }catch(e){}
+
+  if(!res.ok){
+    const detail = json?.error?.message || text || ("HTTP " + res.status);
+    throw new Error(detail);
+  }
+
+  const item = json?.data?.[0];
+  if(item?.b64_json){
+    return `data:image/${output_format};base64,` + item.b64_json;
+  }
+  if(item?.url){
+    // Browser fetch of that URL may be CORS-restricted; we return URL as-is.
+    return item.url;
+  }
+  throw new Error("이미지 응답 형식을 해석하지 못했습니다.");
+}
+
+async function vmGenerateAndApply(kind, aspect){
+  // kind: "bg" | "title"
+  vmSaveApiSettings();
+
+  // Build prompt using current Visual Maker settings.
+  // For title frame, temporarily force titleFrame mode on.
+  const prevTitleMode = $("vmTitleFrame")?.checked;
+  if(kind === "title" && $("vmTitleFrame")) {
+    $("vmTitleFrame").checked = true;
+    $("vmTitleOpts")?.classList.remove("hidden");
+  }
+  if(kind === "bg" && $("vmTitleFrame")) {
+    // leave as-is; user choice respected
+  }
+
+  const prompt = vmBuildPrompt(aspect);
+
+  // restore mode if we forced it
+  if(kind === "title" && $("vmTitleFrame")) {
+    $("vmTitleFrame").checked = true; // keep on for title generation
+  }
+
+  if(!prompt){
+    vmSetApiStatus("장소(필수)가 비어 있습니다.");
+    return;
+  }
+
+  const targetScene = getActiveScene?.() || null;
+  const autoApply = !!$("vmAutoApply")?.checked;
+
+  // enforce portrait-only forbidden on apply
+  if(autoApply && targetScene){
+    if(kind === "bg" && aspect === "port" && !targetScene.background){
+      vmSetApiStatus("세로 배경은 가로 배경이 있어야 적용 가능합니다. 먼저 BG 가로를 생성/업로드하세요.");
+      return;
+    }
+    if(kind === "title" && aspect === "port" && !targetScene.titleFrame){
+      vmSetApiStatus("세로 타이틀프레임은 가로 타이틀프레임이 있어야 적용 가능합니다. 먼저 타이틀프레임 가로를 생성/업로드하세요.");
+      return;
+    }
+  }
+
+  vmSetApiStatus(`요청 중... (${kind}/${aspect})`);
+
+  try{
+    const img = await vmOpenAIImage(prompt, aspect);
+    vmSetApiStatus("완료. 이미지가 생성되었습니다.");
+    if(autoApply && targetScene){
+      if(kind === "bg"){
+        if(aspect === "land") targetScene.background = img;
+        else targetScene.backgroundMobile = img;
+      } else {
+        if(aspect === "land") targetScene.titleFrame = img;
+        else targetScene.titleFrameMobile = img;
+      }
+      // refresh editor previews
+      try{ renderEditor?.(); renderSceneList?.(); }catch(e){}
+      autosave?.();
+    }
+  }catch(err){
+    const msg = String(err?.message || err);
+    vmSetApiStatus(
+`실패: ${msg}
+
+- 브라우저에서 OpenAI API 호출은 CORS 때문에 막힐 수 있습니다.
+- 이 경우, vmApiUrl을 "로컬 프록시" 주소로 바꾸면 해결됩니다.
+- 예: http://localhost:8787/v1/images/generations`
+    );
+  }
+}
+
+function vmRender(){
+  const genLand = $("vmLand").checked;
+  const genPort = $("vmPort").checked;
+  const place = ($("vmPlace").value||"").trim();
+  const titleFrame = $("vmTitleFrame").checked;
+  $("vmOutLandWrap").classList.toggle("hidden", !genLand);
+  $("vmOutPortWrap").classList.toggle("hidden", !genPort);
+
+  const land = genLand ? vmBuildPrompt("land") : "";
+  const port = genPort ? vmBuildPrompt("port") : "";
+  if((genLand && !land) || (genPort && !port)){
+    alert("장소(필수)가 비어 있습니다.");
+    return;
+  }
+  $("vmOutLand").textContent = land;
+  $("vmOutPort").textContent = port;
+  $("vmOutNeg").textContent = vmNeg();
+  // Optional: SVG preview to quickly confirm layouts (no API)
+  const mockOn = $("vmMock") && $("vmMock").checked;
+  const landImg = $("vmImgLand"), portImg = $("vmImgPort");
+  if(landImg){ landImg.classList.toggle("hidden", !(mockOn && genLand)); if(mockOn && genLand) landImg.src = vmMockSvg((titleFrame? "[TITLE FRAME] ":"[BG] ") + place + " (16:9)", 1600, 900); }
+  if(portImg){ portImg.classList.toggle("hidden", !(mockOn && genPort)); if(mockOn && genPort) portImg.src = vmMockSvg((titleFrame? "[TITLE FRAME] ":"[BG] ") + place + " (9:16)", 900, 1600); }
+}
+
+function vmCopyAll(){
+  const parts = [];
+  const land = $("vmOutLand").textContent.trim();
+  const port = $("vmOutPort").textContent.trim();
+  if(land) parts.push("[LAND 16:9]\n"+land);
+  if(port) parts.push("[PORT 9:16]\n"+port);
+  parts.push("[NEG]\n"+$("vmOutNeg").textContent.trim());
+  navigator.clipboard.writeText(parts.join("\n\n"));
+  setStatus("Visual Maker: 전체 복사");
+}
+
+/* ===============================
+   Wire UI
+=============================== */
+function renderAll(){
+  renderSceneList();
+  renderEditor();
+}
+
+function init(){
+  // load autosave
+  const saved = localStorage.getItem("vn_onefile_autosave_v1");
+  if(saved){
+    try{
+      const p = JSON.parse(saved);
+      if(p && Array.isArray(p.scenes) && p.scenes.length){
+        project = p;
+        if(!project.settings) project.settings = { font:"sans", titleStyle:"glow", gameTitle:"My Visual Novel" };
+        if(String(project.settings.titleStyle||"").toLowerCase()==="neon") project.settings.titleStyle="glow";
+        activeSceneId = project.scenes[0].id;
+      }
+    }catch(e){}
+  }
+
+  // sync top
+  $("projectName").value = project.name || "MyVN";
+  $("gameTitle").value = project.settings?.gameTitle || "My Visual Novel";
+  $("fontSel").value = project.settings?.font || "sans";
+  $("titleStyleSel").value = project.settings?.titleStyle || "glow";
+
+  // clean illegal states
+  cleanPortraitOnlyOnLoad();
+  reindexScenes();
+
+  // tabs
+  $("tabGame").addEventListener("click", ()=>setTab("game"));
+  $("tabVisual").addEventListener("click", ()=>setTab("visual"));
+
+  // top actions
+  $("btnAddScene").addEventListener("click", addScene);
+  $("btnSaveProject").addEventListener("click", saveProject);
+  $("btnNewProject").addEventListener("click", newProject);
+  $("btnExportData").addEventListener("click", exportDataJson);
+
+  $("loadProjectFile").addEventListener("change",(e)=>{
+    const f = e.target.files[0];
+    if(!f) return;
+    const r = new FileReader();
+    r.onload = (ev)=>{
+      try{
+        loadProjectFromText(ev.target.result);
+      }catch(err){
+        alert("로드 오류: "+err.message);
+      }
+    };
+    r.readAsText(f);
+    e.target.value="";
+  });
+
+  // preview
+  $("btnPreview").addEventListener("click", openPreview);
+  $("btnClosePrev").addEventListener("click", closePreview);
+  $("btnReloadPrev").addEventListener("click", reloadPreview);
+  $("btnLand").addEventListener("click", ()=>setPreviewMode("landscape"));
+  $("btnPort").addEventListener("click", ()=>setPreviewMode("portrait"));
+
+  // settings binds
+  bindTopSettings();
+
+  // game inputs
+  wireGameInputs();
+
+  // visual maker binds
+  $("vmTitleFrame").addEventListener("change", ()=>{
+    $("vmTitleOpts").classList.toggle("hidden", !$("vmTitleFrame").checked);
+  });
+
+  // OpenAI settings (Visual Maker)
+  vmLoadApiSettings();
+  if ($("vmApiKey")) $("vmApiKey").addEventListener("input", ()=>{ vmSaveApiSettings(); });
+  if ($("vmApiUrl")) $("vmApiUrl").addEventListener("input", ()=>{ vmSaveApiSettings(); });
+
+  if ($("vmGenBgLand")) $("vmGenBgLand").addEventListener("click", ()=>vmGenerateAndApply("bg","land"));
+  if ($("vmGenBgPort")) $("vmGenBgPort").addEventListener("click", ()=>vmGenerateAndApply("bg","port"));
+  if ($("vmGenTitleLand")) $("vmGenTitleLand").addEventListener("click", ()=>vmGenerateAndApply("title","land"));
+  if ($("vmGenTitlePort")) $("vmGenTitlePort").addEventListener("click", ()=>vmGenerateAndApply("title","port"));
+  $("vmBuild").addEventListener("click", vmRender);
+  $("vmCopy").addEventListener("click", vmCopyAll);
+  $("vmSample").addEventListener("click", ()=>{
+    $("vmPlace").value="비 오는 거리";
+    $("vmTime").value="밤, 비";
+    $("vmObj").value="가로등, 젖은 보도블록, 빗물 웅덩이, 네온 반사(문자 없는 형태)";
+    $("vmMood").value="긴장";
+    $("vmStyle").value="semi_real";
+    $("vmLand").checked=true;
+    $("vmPort").checked=true;
+    $("vmTitleFrame").checked=false;
+    $("vmTitleOpts").classList.add("hidden");
+    $("vmOutLand").textContent="";
+    $("vmOutPort").textContent="";
+    $("vmOutNeg").textContent="";
+    setStatus("Visual Maker: 샘플 입력");
+  });
+
+  // first render
+  renderAll();
+  setTab("game");
+  // vmRender() 자동 실행 제거: 장소 미입력 경고 방지
+  setStatus("로드 완료");
+}
+init();
+</script>
+</body>
+</html>
