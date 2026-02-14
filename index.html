@@ -409,26 +409,39 @@
 =============================== */
 function makeDefaultProject(){
   return {
-  name: "MyVN",
-  settings: { font: "sans", titleStyle: "glow", gameTitle: "My Visual Novel" },
-  scenes: [{
-    id: 1,
-    type: "normal", // normal | title
-    // bg
-    background: "",
-    backgroundMobile: "",
-    // title frame (optional)
-    titleFrame: "",
-    titleFrameMobile: "",
-    titleText: "",
-    subtitleText: "",
-    safeAreaPos: "center", // center | top
-    frameIntensity: "subtle",
-    // content
-    script: [{ speaker: "???", text: "안녕하세요. {{player}}", motion: "" }],
-    choices: []
-  }]
-}
+    name: "MyVN",
+    settings: { font: "sans", titleStyle: "glow", gameTitle: "My Visual Novel" },
+    scenes: [
+      {
+        id: 1,
+        type: "title", // 첫 씬은 항상 타이틀
+        background: "",
+        backgroundMobile: "",
+        titleFrame: "",
+        titleFrameMobile: "",
+        titleText: "My Visual Novel",
+        subtitleText: "",
+        safeAreaPos: "center",
+        frameIntensity: "subtle",
+        script: [{ speaker: "???", text: "", motion: "", charImg: "" }],
+        choices: []
+      },
+      {
+        id: 2,
+        type: "normal",
+        background: "",
+        backgroundMobile: "",
+        titleFrame: "",
+        titleFrameMobile: "",
+        titleText: "",
+        subtitleText: "",
+        safeAreaPos: "center",
+        frameIntensity: "subtle",
+        script: [{ speaker: "???", text: "안녕하세요. {{player}}", motion: "", charImg: "" }],
+        choices: []
+      }
+    ]
+  };
 }
 
 let project = makeDefaultProject();
@@ -468,6 +481,16 @@ function setStatus(msg){
 }
 
 
+// 첫 장면은 무조건 타이틀로 강제(배열 순서 기준).
+function enforceFirstSceneTitle(){
+  if (!project.scenes || project.scenes.length === 0) return;
+  const first = project.scenes[0];
+  if (first.type !== "title") first.type = "title";
+  // 타이틀 텍스트가 비어있으면 게임 타이틀을 기본값으로
+  if (!first.titleText) first.titleText = (project.settings?.gameTitle || "My Visual Novel");
+}
+
+
 // Reindex scenes to ensure Scene 1 always exists and ids are sequential (1..N).
 // Also rewrites choice nextSceneId references to keep links valid.
 function reindexScenes(){
@@ -491,6 +514,7 @@ function reindexScenes(){
   // update activeSceneId to new mapping, fallback to 1
   const mapped = oldToNew.get(Number(activeSceneId));
   activeSceneId = mapped ? mapped : 1;
+  enforceFirstSceneTitle();
 }
 
 // Start a fresh project (clears autosave too)
@@ -798,7 +822,20 @@ function wireGameInputs(){
   // scene type
   $("sceneType").addEventListener("change", ()=>{
     const s = getActiveScene();
-    s.type = $("sceneType").value;
+    const v = $("sceneType").value;
+
+    // 첫 장면은 반드시 타이틀(배열 1번 규칙)
+    if(project.scenes[0] && s.id === project.scenes[0].id && v !== "title"){
+      alert("프로젝트의 맨 첫 장면은 반드시 타이틀(TITLE)이어야 합니다.");
+      $("sceneType").value = "title";
+      s.type = "title";
+      autosave();
+      renderSceneList();
+      return;
+    }
+
+    s.type = v;
+    enforceFirstSceneTitle();
     autosave();
     renderSceneList();
   });
@@ -939,6 +976,7 @@ function loadProjectFromText(text){
   activeSceneId = project.scenes[0].id;
   cleanPortraitOnlyOnLoad();
   reindexScenes();
+  enforceFirstSceneTitle();
   syncTopSettingsToUI();
   renderAll();
   autosave();
@@ -1000,6 +1038,16 @@ function bindTopSettings(){
 =============================== */
 function openPreview(){
   if(!validateNoPortraitOnly("미리보기")) return;
+
+  // 첫 씬은 무조건 타이틀(배열 기준)
+  if(project.scenes[0] && project.scenes[0].type !== "title"){
+    project.scenes[0].type = "title";
+    if(!project.scenes[0].titleText) project.scenes[0].titleText = (project.settings?.gameTitle || "My Visual Novel");
+    autosave();
+    renderAll();
+    alert("첫 장면은 타이틀로 고정됩니다. (자동 적용)");
+  }
+
   $("previewOverlay").classList.remove("hidden");
   reloadPreview();
 }
@@ -1275,19 +1323,11 @@ function buildRuntimeHTML(DATA, forcedMode){
   const KEY="VN_ONEFILE_SAVE";
 
     function getStartSceneId(){
-      // "Scene 1"은 배열 첫 요소가 아니라 id===1인 장면을 의미
-      const s1 = scenes.find(s=>s && s.id===1) || scenes[0];
-      if(s1 && s1.type==="title"){
-        const s2 = scenes.find(s=>s && s.id===2) || scenes.find(s=>s && s.id!==s1.id);
-        return (s2 && s2.id) ? s2.id : s1.id;
-      }
-      return (s1 && s1.id) ? s1.id : 1;
-    }
-      return (scenes[0] && scenes[0].id) ? scenes[0].id : 1;
+      // 배열 순서 기준: 0번(Scene1 타이틀) 다음 씬으로 시작
+      return (scenes[1] && scenes[1].id) ? scenes[1].id : ((scenes[0] && scenes[0].id) ? scenes[0].id : 1);
     }
 
-
-  function fontFamily(font){
+function fontFamily(font){
     if(font==="serif") return "'Batang', serif";
     if(font==="cursive") return "'Gaegu', cursive";
     return "'Apple SD Gothic Neo','Malgun Gothic',sans-serif";
@@ -1477,7 +1517,7 @@ function buildRuntimeHTML(DATA, forcedMode){
   }
 
   (function init(){
-    const s1 = scenes.find(s=>s && s.id===1) || scenes[0];
+    const first = scenes[0];
 
     // 기본 UI 세팅
     document.getElementById("gameTitle").textContent = meta.gameTitle || "My Visual Novel";
@@ -1485,16 +1525,25 @@ function buildRuntimeHTML(DATA, forcedMode){
     applyTitleStyle();
     checkOrient();
     checkSave();
-    validate();
 
-    // Scene1이 title이면: 게임 실행 화면을 "Scene1 타이틀 + Start/Continue"로 구성
-    if(s1 && s1.type==="title"){
-      cur = s1;
-      setBg(); // titleFrame 우선 배경
-      document.getElementById("gameTitle").textContent = s1.titleText || (meta.gameTitle || "My Visual Novel");
-      document.getElementById("titleSub").textContent = s1.subtitleText || "";
+    const ok = validate();
+    if(!ok) return;
+
+    // ✅ 규칙: 프로젝트의 "맨 첫 장면(배열 1번)"은 반드시 TITLE
+    if(!first || first.type!=="title"){
+      const f = document.getElementById("fatal");
+      f.textContent = "프로젝트의 첫 장면(배열 1번)은 반드시 TITLE이어야 합니다.\n편집기에서 첫 씬을 타이틀로 설정하세요.";
+      f.classList.remove("hidden");
+      document.querySelectorAll(".btn").forEach(b=>b.disabled=true);
+      return;
     }
-  })();
+
+    // 첫 씬(타이틀)을 타이틀 화면에 반영
+    cur = first;
+    setBg(); // titleFrame 우선 배경
+    document.getElementById("gameTitle").textContent = first.titleText || (meta.gameTitle || "My Visual Novel");
+    document.getElementById("titleSub").textContent = first.subtitleText || "";
+  })();;
 <\/script></body></html>`;
 }
 
