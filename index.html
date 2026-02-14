@@ -1275,10 +1275,14 @@ function buildRuntimeHTML(DATA, forcedMode){
   const KEY="VN_ONEFILE_SAVE";
 
     function getStartSceneId(){
-      // Scene 1이 title이면: OK 후 Scene 2로 진입(없으면 Scene1)
-      if(scenes[0] && scenes[0].type==="title"){
-        return (scenes[1] && scenes[1].id) ? scenes[1].id : scenes[0].id;
+      // "Scene 1"은 배열 첫 요소가 아니라 id===1인 장면을 의미
+      const s1 = scenes.find(s=>s && s.id===1) || scenes[0];
+      if(s1 && s1.type==="title"){
+        const s2 = scenes.find(s=>s && s.id===2) || scenes.find(s=>s && s.id!==s1.id);
+        return (s2 && s2.id) ? s2.id : s1.id;
       }
+      return (s1 && s1.id) ? s1.id : 1;
+    }
       return (scenes[0] && scenes[0].id) ? scenes[0].id : 1;
     }
 
@@ -1473,11 +1477,9 @@ function buildRuntimeHTML(DATA, forcedMode){
   }
 
   (function init(){
-    const first = scenes[0];
-    // Scene 1이 title이면: 타이틀 화면을 Scene1 기반으로 표시(프레임 배경 + 타이틀 텍스트)
-    if(first && first.type==="title"){
-      cur = first;
-    }
+    const s1 = scenes.find(s=>s && s.id===1) || scenes[0];
+
+    // 기본 UI 세팅
     document.getElementById("gameTitle").textContent = meta.gameTitle || "My Visual Novel";
     document.getElementById("titleSub").textContent = "";
     applyTitleStyle();
@@ -1485,11 +1487,12 @@ function buildRuntimeHTML(DATA, forcedMode){
     checkSave();
     validate();
 
-    if(first && first.type==="title"){
-      // 방향 계산 후 배경 적용
-      setBg();
-      document.getElementById("gameTitle").textContent = first.titleText || (meta.gameTitle || "My Visual Novel");
-      document.getElementById("titleSub").textContent = first.subtitleText || "";
+    // Scene1이 title이면: 게임 실행 화면을 "Scene1 타이틀 + Start/Continue"로 구성
+    if(s1 && s1.type==="title"){
+      cur = s1;
+      setBg(); // titleFrame 우선 배경
+      document.getElementById("gameTitle").textContent = s1.titleText || (meta.gameTitle || "My Visual Novel");
+      document.getElementById("titleSub").textContent = s1.subtitleText || "";
     }
   })();
 <\/script></body></html>`;
